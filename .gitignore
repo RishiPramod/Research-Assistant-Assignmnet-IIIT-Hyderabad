@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Large local raw datasets and heavy caches
+data/
+raw_data/
+scratch/
+
+# In preprocessed_data, ignore heavy extracted acoustic feature caches if generated locally
+preprocessed_data/**/mel/
+preprocessed_data/**/pitch/
+preprocessed_data/**/energy/
+preprocessed_data/**/duration/
+preprocessed_data/**/TextGrid/
+
+# Tensorboard event binaries
+output/
+events.out.tfevents.*
+
+# Stray test files
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Reference materials in root
+/FastSpeech2_Assignment.pdf
+/2006.04558v8.pdf
+/mfa_clean_manifest.py
+/mfa_dataset_transfer.py
+/README_slfi1
+
+# Explicitly ensure Technical_Report.pdf is tracked
+!project/Report/Technical_Report.pdf
+

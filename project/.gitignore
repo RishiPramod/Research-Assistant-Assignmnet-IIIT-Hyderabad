@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python packaging & distribution
+build/
+dist/
+*.egg-info/
+
+# Large local raw datasets and preprocessed caches (can be regenerated via preprocess.py)
+data/
+raw_data/
+preprocessed_data/
+scratch/
+
+# Tensorboard event binaries (loss curves are preserved in Results/)
+output/
+events.out.tfevents.*
+
+# Temporary, swap, and OS files
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

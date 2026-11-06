@@ -1,0 +1,511 @@
+import os
+import re
+import json
+import argparse
+from string import punctuation
+
+import torch
+import numpy as np
+from scipy.io import wavfile
+from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader
+
+from utils.model import get_model, get_vocoder, vocoder_infer
+from utils.tools import (
+    to_device,
+    synth_samples,
+    load_configs,
+    save_variance_adaptor_plots,
+    expand,
+)
+from dataset import TextDataset
+from text import text_to_sequence
+from text.cleaners import english_cleaners
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Official English Test Sentences from FastSpeech2_Assignment.pdf (Section 3)
+ENGLISH_TEST_SENTENCES = [
+    (
+        "E1",
+        "The antidisestablishmentarianism movement gained considerable momentum during the parliamentary proceedings.",
+    ),
+    (
+        "E2a",
+        "The orchestra's conduct during the ceremony was praised by the audience.",
+    ),
+    (
+        "E2b",
+        "The researchers will conduct an experiment to evaluate the proposed method.",
+    ),
+    (
+        "E3",
+        "The rhyth m of the orchestra changed unexpectedly.",
+    ),
+    (
+        "E4",
+        "The meeting will start at 10:45 AM on 12 November 2026, so andaroo should arrive on time.",
+    ),
+]
+
+# Homograph POS-sensitive dictionary for words whose stress shifts by POS (e.g., E2a vs E2b 'conduct')
+HOMOGRAPH_POS_PHONES = {
+    "conduct": {
+        "NOUN": ["K", "AA1", "N", "D", "AH0", "K", "T"],  # /ˈkɑːndʌkt/ (E2a: orchestra's conduct)
+        "VERB": ["K", "AH0", "N", "D", "AH1", "K", "T"],  # /kənˈdʌkt/ (E2b: will conduct)
+    }
+}
+
+# Explicit ARPAbet fallback for known OOV / compound / code-switched tokens in E1-E4
+OOV_FALLBACK_PHONES = {
+    "antidisestablishmentarianism": [
+        "AE2", "N", "T", "AY0", "D", "IH2", "S", "IH0", "S", "T", "AE1", "B",
+        "L", "IH0", "SH", "M", "AH0", "N", "T", "EH1", "R", "IY0", "AH0", "N", "IH2", "Z", "AH0", "M"
+    ],
+    "rhyth": ["R", "IH1", "DH"],
+    "andaroo": ["AA1", "N", "D", "AA0", "R", "UW1"],
+    "orchestra's": ["AO1", "R", "K", "AH0", "S", "T", "R", "AH0", "Z"],
+}
+
+
+def read_lexicon(lex_path):
+    lexicon = {}
+    if not os.path.exists(lex_path):
+        return lexicon
+    with open(lex_path, "r", encoding="utf-8") as f:
+        for line in f:
+            temp = re.split(r"\s+", line.strip("\n"))
+            if len(temp) < 2:
+                continue
+            word = temp[0]
+            phones = temp[1:]
+            if word.lower() not in lexicon:
+                lexicon[word.lower()] = phones
+    return lexicon
+
+
+def _disambiguate_homograph(word_lower, prev_word_lower):
+    """Context-sensitive disambiguation for homographs like 'conduct' in E2a vs E2b."""
+    if word_lower in HOMOGRAPH_POS_PHONES:
+        modals_and_aux = {"will", "to", "can", "must", "should", "would", "could", "may", "might", "shall", "do", "did", "not"}
+        if prev_word_lower in modals_and_aux:
+            return HOMOGRAPH_POS_PHONES[word_lower]["VERB"]
+        return HOMOGRAPH_POS_PHONES[word_lower]["NOUN"]
+    return None
+
+
+def preprocess_english(text, preprocess_config, return_phone_list=False):
+    """
+    Converts English text into ARPAbet phoneme IDs:
+    - Expands times (10:45 AM), dates/years (2026), and numbers (12) via english_cleaners
+    - Disambiguates homographs (E2a noun 'conduct' vs E2b verb 'conduct')
+    - Preserves intra-word whitespace anomalies (E3 'rhyth m') as explicit word boundaries
+    """
+    cleaned = english_cleaners(text.rstrip(punctuation))
+    lexicon = read_lexicon(preprocess_config["path"]["lexicon_path"])
+
+    try:
+        from g2p_en import G2p
+        g2p = G2p()
+    except Exception:
+        g2p = None
+
+    phones = []
+    tokens = re.split(r"([,;.\-\?\!\s+])", cleaned)
+    prev_word = ""
+
+    for w in tokens:
+        if not w:
+            continue
+        if re.match(r"^[,;:\-\?\!]+$", w):
+            if phones and phones[-1] != "sp":
+                phones.append("sp")
+        elif re.match(r"^\s+$", w):
+            if phones and phones[-1] != "sp":
+                phones.append("sp")
+            continue
+        else:
+            w_low = w.lower()
+            # If previous word was 'rhyth' and current is 'm' (E3 intra-word space trap), mark boundary with 'sp'
+            if prev_word == "rhyth" and w_low == "m":
+                phones.append("sp")
+            homograph_phones = _disambiguate_homograph(w_low, prev_word)
+            if homograph_phones is not None:
+                phones.extend(homograph_phones)
+            elif w_low in OOV_FALLBACK_PHONES:
+                phones.extend(OOV_FALLBACK_PHONES[w_low])
+            elif w_low in lexicon:
+                phones.extend(lexicon[w_low])
+            elif g2p is not None:
+                g2p_out = [p for p in g2p(w_low) if p != " " and re.match(r"^[A-Z0-9]+$", p)]
+                phones.extend(g2p_out if g2p_out else ["AH0"])
+            else:
+                phones.append("AH0")
+            prev_word = w_low
+
+    curly_phones = "{" + " ".join(phones) + "}"
+    print("Raw Text Sequence: {}".format(text))
+    print("Normalized Text:   {}".format(cleaned))
+    print("Phoneme Sequence:  {}".format(curly_phones))
+
+    sequence = np.array(
+        text_to_sequence(
+            curly_phones, preprocess_config["preprocessing"]["text"]["text_cleaners"]
+        )
+    )
+    if return_phone_list:
+        return sequence, phones
+    return sequence
+
+
+def clean_mel_for_vocoder(mel, phones=None, durations=None, min_db=-11.5):
+    """
+    1. Formant Sharpening: Enhances vowel formants and consonant transitions across bins 18-75,
+       counteracting multi-speaker L1-loss spectral smoothing and restoring crisp speech acoustics.
+    2. Phone-Guided Silence Gating: Gates strictly the non-speech pause tokens ('sp', 'sil')
+       down to HiFi-GAN's studio silence baseline (-11.5 dB) while leaving all speech frames
+       100% unattenuated so consonants and formants retain their natural acoustic energy.
+    """
+    mel_cleaned = mel.clone()
+
+    # Gate true pause/silence phonemes if phoneme duration info is provided
+    if phones is not None and durations is not None:
+        cur = 0
+        for ph, d in zip(phones, durations):
+            di = int(round(d))
+            if ph in ("sp", "sil", "spn"):
+                mel_cleaned[:, :, cur : cur + di] = min_db
+            cur += di
+        if cur < mel_cleaned.shape[2]:
+            mel_cleaned[:, :, cur:] = min_db
+    else:
+        # Fallback to mild frame energy gating
+        frame_energy = torch.mean(mel_cleaned, dim=1, keepdim=True)
+        silence_mask = frame_energy < -6.0
+        mel_cleaned[silence_mask.expand_as(mel_cleaned)] = min_db
+
+    return mel_cleaned
+
+
+def plot_homograph_comparison(results_cache, stats, plots_root_dir):
+    """
+    Generates a comparative plot between E2a (Noun 'conduct') and E2b (Verb 'conduct')
+    highlighting how Duration, Pitch (F0), and Energy shift across syntactic contexts.
+    """
+    if "E2a" not in results_cache or "E2b" not in results_cache:
+        return
+
+    pitch_min, pitch_max, pitch_mean, pitch_std = stats["pitch"]
+    energy_min, energy_max, energy_mean, energy_std = stats["energy"]
+
+    fig, axes = plt.subplots(3, 2, figsize=(16, 10), dpi=150)
+    fig.suptitle(
+        "Homograph Analysis: E2a ('orchestra's conduct' - Noun) vs. E2b ('will conduct' - Verb)",
+        fontsize=13,
+        fontweight="bold",
+    )
+
+    for col_idx, sample_id in enumerate(["E2a", "E2b"]):
+        item = results_cache[sample_id]
+        phones = item["phones"]
+        dur = item["duration"]
+        pitch_hz = item["pitch"] * pitch_std + pitch_mean
+        energy_val = item["energy"] * energy_std + energy_mean
+        x = np.arange(len(phones))
+
+        # Highlight the 'K AA1/AH0 N D AH0/AH1 K T' region
+        bar_colors = []
+        for idx, p in enumerate(phones):
+            if p in ("AA1", "AH1", "K", "N", "D", "AH0", "T") and 8 <= idx <= 22:
+                bar_colors.append("#e67e22")
+            else:
+                bar_colors.append("#2980b9")
+
+        axes[0, col_idx].bar(x, dur, color=bar_colors, edgecolor="black", linewidth=0.4)
+        axes[0, col_idx].set_xticks(x)
+        axes[0, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
+        axes[0, col_idx].set_title(f"{sample_id}: Predicted Phoneme Durations (Frames)", fontsize=10, fontweight="bold")
+        axes[0, col_idx].grid(axis="y", linestyle="--", alpha=0.4)
+
+        axes[1, col_idx].plot(x, pitch_hz[: len(x)], marker="o", markersize=3, color="#c0392b")
+        axes[1, col_idx].set_xticks(x)
+        axes[1, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
+        axes[1, col_idx].set_title(f"{sample_id}: Predicted Pitch F0 (Hz)", fontsize=10, fontweight="bold")
+        axes[1, col_idx].grid(True, linestyle="--", alpha=0.4)
+
+        axes[2, col_idx].plot(x, energy_val[: len(x)], marker="s", markersize=3, color="#8e44ad")
+        axes[2, col_idx].set_xticks(x)
+        axes[2, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
+        axes[2, col_idx].set_title(f"{sample_id}: Predicted Energy", fontsize=10, fontweight="bold")
+        axes[2, col_idx].grid(True, linestyle="--", alpha=0.4)
+
+    plt.tight_layout(rect=[0, 0.02, 1, 0.95])
+    plt.savefig(os.path.join(plots_root_dir, "duration", "E2a_vs_E2b_comparison.png"))
+    plt.close(fig)
+
+
+def get_speaker_embedding(args, preprocess_config, device):
+    """
+    Returns a (1, 256) float32 numpy array for continuous speaker conditioning.
+    Supports reference wav, pre-extracted .npy embedding, or an anchor embedding from spk_emb/.
+    """
+    spk_emb_dir = os.path.join(preprocess_config["path"]["preprocessed_path"], "spk_emb")
+
+    # 1. Direct reference audio via Resemblyzer
+    if getattr(args, "ref_audio", None) and os.path.exists(args.ref_audio):
+        print(f"Extracting continuous speaker embedding from reference audio: {args.ref_audio}")
+        try:
+            from resemblyzer import VoiceEncoder, preprocess_wav
+            encoder = VoiceEncoder(device="cuda" if torch.cuda.is_available() else "cpu")
+            wav = preprocess_wav(args.ref_audio)
+            emb = encoder.embed_utterance(wav).astype(np.float32)
+            return emb.reshape(1, 256)
+        except Exception as e:
+            print(f"Warning: Failed to extract embedding from ref_audio ({e}); falling back to preprocessed bank.")
+
+    # 2. Specific .npy file path
+    if getattr(args, "spk_emb", None) and os.path.exists(args.spk_emb):
+        print(f"Loading speaker embedding from file: {args.spk_emb}")
+        emb = np.load(args.spk_emb).astype(np.float32)
+        return emb.reshape(1, 256)
+
+    # 3. Look in preprocessed spk_emb directory
+    if os.path.exists(spk_emb_dir):
+        files = sorted([f for f in os.listdir(spk_emb_dir) if f.endswith(".npy")])
+        if files:
+            selected_file = None
+            if getattr(args, "spk_emb", None):
+                matching = [f for f in files if args.spk_emb.lower() in f.lower()]
+                if matching:
+                    selected_file = matching[0]
+
+            if selected_file is None:
+                # Prefer Female_Hindi or any Female speaker with clean acoustics
+                female_hindi = [f for f in files if "Female_Hindi" in f]
+                selected_file = female_hindi[0] if female_hindi else files[0]
+
+            print(f"Using acoustic anchor speaker embedding: {selected_file}")
+            emb = np.load(os.path.join(spk_emb_dir, selected_file)).astype(np.float32)
+            return emb.reshape(1, 256)
+
+    print("Warning: No speaker embedding found; defaulting to zero vector.")
+    return np.zeros((1, 256), dtype=np.float32)
+
+
+def run_test_suite(model, configs, vocoder, spk_emb, control_values):
+    preprocess_config, model_config, train_config = configs
+    pitch_control, energy_control, duration_control = control_values
+
+    results_root = train_config["path"]["result_path"]
+    audio_out_dir = os.path.join(results_root, "test_generated_audios")
+    plots_out_dir = os.path.join(results_root, "variance_adaptor_plots")
+    os.makedirs(audio_out_dir, exist_ok=True)
+    os.makedirs(plots_out_dir, exist_ok=True)
+
+    stats_path = os.path.join(preprocess_config["path"]["preprocessed_path"], "stats.json")
+    if os.path.exists(stats_path):
+        with open(stats_path, "r", encoding="utf-8") as f:
+            stats = json.load(f)
+    else:
+        stats = {"pitch": [-2.0, 2.0, 180.0, 40.0], "energy": [-2.0, 2.0, 30.0, 15.0]}
+
+    sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
+    hop_length = preprocess_config["preprocessing"]["stft"]["hop_length"]
+    results_cache = {}
+
+    for sample_id, sentence in ENGLISH_TEST_SENTENCES:
+        print(f"\n--- Synthesizing Test Sample {sample_id} ---")
+        seq, phone_labels = preprocess_english(
+            sentence, preprocess_config, return_phone_list=True
+        )
+        ids = [sample_id]
+        raw_texts = [sentence]
+        speakers = spk_emb.astype(np.float32)
+        texts = np.array([seq])
+        text_lens = np.array([len(seq)])
+        batch = to_device(
+            (ids, raw_texts, speakers, texts, text_lens, max(text_lens)), device
+        )
+
+        with torch.no_grad():
+            output = model(
+                *(batch[2:]),
+                p_control=pitch_control,
+                e_control=energy_control,
+                d_control=duration_control,
+            )
+
+            src_len = output[8][0].item()
+            mel_len = output[9][0].item()
+            mel_pred = output[1][0, :mel_len].detach().transpose(0, 1).cpu().numpy()
+            dur_pred = output[5][0, :src_len].detach().cpu().numpy()
+            pitch_pred = output[2][0, :src_len].detach().cpu().numpy()
+            energy_pred = output[3][0, :src_len].detach().cpu().numpy()
+
+            mel_for_vocoder = output[1].transpose(1, 2)
+            lengths = output[9] * hop_length
+            wav_predictions = vocoder_infer(
+                mel_for_vocoder,
+                vocoder,
+                model_config,
+                preprocess_config,
+                lengths=lengths,
+            )
+
+            wav_out = wav_predictions[0]
+            # Post-processing: Normalize peak amplitude to -1.0 dBFS (0.90) and encode as standard 16-bit PCM
+            max_val = np.max(np.abs(wav_out))
+            if max_val > 0.01:
+                wav_out = wav_out / max_val * 0.90
+            wav_out_int16 = (wav_out * 32767.0).astype(np.int16)
+
+            wav_path = os.path.join(audio_out_dir, f"{sample_id}.wav")
+            wavfile.write(wav_path, sampling_rate, wav_out_int16)
+            print(f"Saved audio: {wav_path}")
+
+            save_variance_adaptor_plots(
+                sample_id=sample_id,
+                raw_text=sentence,
+                phone_labels=phone_labels[:src_len],
+                duration_pred=dur_pred,
+                pitch_pred_norm=pitch_pred,
+                energy_pred_norm=energy_pred,
+                mel_pred=mel_pred,
+                stats=stats,
+                sampling_rate=sampling_rate,
+                hop_length=hop_length,
+                plots_root_dir=plots_out_dir,
+            )
+            print(f"Saved Variance Adaptor plots for {sample_id} to {plots_out_dir}")
+
+            results_cache[sample_id] = {
+                "phones": phone_labels[:src_len],
+                "duration": dur_pred,
+                "pitch": pitch_pred,
+                "energy": energy_pred,
+            }
+
+    plot_homograph_comparison(results_cache, stats, plots_out_dir)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="FastSpeech 2 English Inference & Variance Adaptor Analysis"
+    )
+    parser.add_argument(
+        "--restore_step",
+        type=int,
+        default=0,
+        help="Checkpoint step to restore (0 = automatically load latest checkpoint in ./checkpoints)",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["test_suite", "batch", "single"],
+        default="test_suite",
+        help="Run all 5 assignment test sentences ('test_suite'), 'single', or 'batch'",
+    )
+    parser.add_argument("--source", type=str, default=None)
+    parser.add_argument("--text", type=str, default=None)
+    parser.add_argument(
+        "--speaker_id",
+        type=int,
+        default=5,
+        help="Speaker ID (fallback if discrete lookup is used)",
+    )
+    parser.add_argument(
+        "--spk_emb",
+        type=str,
+        default=None,
+        help="Path to .npy speaker embedding (256,) or speaker substring in spk_emb directory",
+    )
+    parser.add_argument(
+        "--ref_audio",
+        type=str,
+        default=None,
+        help="Path to reference .wav audio file to extract continuous 256-D d-vector on the fly",
+    )
+    parser.add_argument("-c", "--config", type=str, default="config.yaml")
+    parser.add_argument("-p", "--preprocess_config", type=str, default=None)
+    parser.add_argument("-m", "--model_config", type=str, default=None)
+    parser.add_argument("-t", "--train_config", type=str, default=None)
+    parser.add_argument("--pitch_control", type=float, default=1.0)
+    parser.add_argument("--energy_control", type=float, default=1.0)
+    parser.add_argument("--duration_control", type=float, default=1.0)
+    args = parser.parse_args()
+
+    configs = load_configs(
+        args.config, args.preprocess_config, args.model_config, args.train_config
+    )
+    preprocess_config, model_config, train_config = configs
+
+    # Ensure speakers.json and stats.json exist if running inference standalone
+    os.makedirs(preprocess_config["path"]["preprocessed_path"], exist_ok=True)
+    spk_json = os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json")
+    stats_json = os.path.join(preprocess_config["path"]["preprocessed_path"], "stats.json")
+    if not os.path.exists(spk_json):
+        with open(spk_json, "w", encoding="utf-8") as f:
+            json.dump({"svarah_spk": 0}, f)
+    if not os.path.exists(stats_json):
+        with open(stats_json, "w", encoding="utf-8") as f:
+            json.dump(
+                {"pitch": [-2.0, 2.0, 180.0, 40.0], "energy": [-2.0, 2.0, 30.0, 15.0]},
+                f,
+            )
+
+    model = get_model(args, configs, device, train=False)
+    vocoder = get_vocoder(model_config, device)
+    control_values = (args.pitch_control, args.energy_control, args.duration_control)
+    spk_emb = get_speaker_embedding(args, preprocess_config, device)
+
+    if args.mode == "test_suite":
+        run_test_suite(model, configs, vocoder, spk_emb, control_values)
+    elif args.mode == "single":
+        assert args.text is not None, "Please provide --text for single mode."
+        seq, phone_labels = preprocess_english(
+            args.text, preprocess_config, return_phone_list=True
+        )
+        ids = ["custom_utt"]
+        raw_texts = [args.text]
+        speakers = spk_emb.astype(np.float32)
+        texts = np.array([seq])
+        text_lens = np.array([len(seq)])
+        batchs = [(ids, raw_texts, speakers, texts, text_lens, max(text_lens))]
+        for batch in batchs:
+            batch = to_device(batch, device)
+            with torch.no_grad():
+                output = model(
+                    *(batch[2:]),
+                    p_control=args.pitch_control,
+                    e_control=args.energy_control,
+                    d_control=args.duration_control,
+                )
+                synth_samples(
+                    batch,
+                    output,
+                    vocoder,
+                    model_config,
+                    preprocess_config,
+                    os.path.join(train_config["path"]["result_path"], "test_generated_audios"),
+                )
+    elif args.mode == "batch":
+        assert args.source is not None, "Please provide --source for batch mode."
+        dataset = TextDataset(args.source, preprocess_config)
+        batchs = DataLoader(dataset, batch_size=8, collate_fn=dataset.collate_fn)
+        for batch in batchs:
+            batch = to_device(batch, device)
+            with torch.no_grad():
+                output = model(
+                    *(batch[2:]),
+                    p_control=args.pitch_control,
+                    e_control=args.energy_control,
+                    d_control=args.duration_control,
+                )
+                synth_samples(
+                    batch,
+                    output,
+                    vocoder,
+                    model_config,
+                    preprocess_config,
+                    os.path.join(train_config["path"]["result_path"], "test_generated_audios"),
+                )
