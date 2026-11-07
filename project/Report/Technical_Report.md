@@ -1,9 +1,11 @@
 # FastSpeech 2 for English and Telugu Speech Synthesis
 
-**Rishi Pramod Chintakayala**  
-*Research Assistant Technical Report — Speech and Language Processing*  
-*International Institute of Information Technology Hyderabad (IIIT-H)*  
+<div class="author-header">
+<strong>Rishi Pramod Chintakayala</strong><br>
+<em>Research Assistant Technical Report — Speech and Language Processing</em><br>
+<em>International Institute of Information Technology Hyderabad (IIIT-H)</em><br>
 Base Reference: FastSpeech 2: Fast and High-Quality End-to-End Text to Speech (Ren et al., ICLR 2021)
+</div>
 
 ---
 
@@ -79,7 +81,7 @@ The mel-spectrogram reconstruction loss (*L*<sub>mel</sub>) and PostNet refineme
 
 ## 3. Analysis of Training and Validation Loss Curves
 
-### 3.1 Loss Table Across 30,000 Steps
+### 3.1 Loss Table and Convergence Trajectory Across 30,000 Steps
 Table 2 reports the progression of training and validation loss values across 30,000 steps for both the English and Telugu models:
 
 | Model | Checkpoint Step | Total Loss | Mel Loss (L₁) | PostNet Loss (L₁) | Pitch Loss (MSE) | Energy Loss (MSE) | Duration Loss (MSE) |
@@ -95,25 +97,25 @@ Table 2 reports the progression of training and validation loss values across 30
 | | **Step 30,000 (Train)** | **0.7132** | **0.3380** | **0.3374** | **0.0176** | **0.0146** | **0.0056** |
 | | **Step 30,000 (Val)** | **2.2700** | **0.6287** | **0.6286** | **0.6423** | **0.2864** | **0.0839** |
 
-<div class="figure-grid">
-  <div class="figure-item">
-    <img src="../../Results/English/training_loss.png" alt="English Training Loss">
-    <div class="caption">(a) English Training Loss</div>
-  </div>
-  <div class="figure-item">
-    <img src="../../Results/English/validation_loss.png" alt="English Validation Loss">
-    <div class="caption">(b) English Validation Loss</div>
-  </div>
-  <div class="figure-item">
-    <img src="../../Results/Telugu/training_loss.png" alt="Telugu Training Loss">
-    <div class="caption">(c) Telugu Training Loss</div>
-  </div>
-  <div class="figure-item">
-    <img src="../../Results/Telugu/validation_loss.png" alt="Telugu Validation Loss">
-    <div class="caption">(d) Telugu Validation Loss</div>
-  </div>
+<div class="figure-full">
+  <img src="../../Results/English/training_loss.png" alt="English Training Loss">
+  <div class="caption">Figure 1a: English FastSpeech 2 training loss curves across 30,000 steps, showing Total Loss, Mel MAE, PostNet MAE, Duration MSE, Pitch MSE, and Energy MSE.</div>
 </div>
-<div class="figure-main-caption"><strong>Figure 1:</strong> Training and validation loss curves across 30,000 steps for English (top row) and Telugu (bottom row). Both models show smooth convergence with stable validation curves.</div>
+
+<div class="figure-full">
+  <img src="../../Results/English/validation_loss.png" alt="English Validation Loss">
+  <div class="caption">Figure 1b: English FastSpeech 2 validation loss curves evaluated across validation checkpoints, demonstrating stable convergence without overfitting.</div>
+</div>
+
+<div class="figure-full">
+  <img src="../../Results/Telugu/training_loss.png" alt="Telugu Training Loss">
+  <div class="caption">Figure 1c: Telugu FastSpeech 2 training loss curves across 30,000 steps, showing rapid initial convergence and steady refinement.</div>
+</div>
+
+<div class="figure-full">
+  <img src="../../Results/Telugu/validation_loss.png" alt="Telugu Validation Loss">
+  <div class="caption">Figure 1d: Telugu FastSpeech 2 validation loss curves evaluated across validation checkpoints, showing smooth generalization on clean single-speaker speech.</div>
+</div>
 
 ### 3.2 Convergence Behaviour and Generalization Analysis
 1. **Warmup and Convergence:** Both models converged smoothly during training. As the learning rate reached its peak after the 2,000 warmup steps, total loss dropped by more than 60% within the first 5,000 steps. Duration prediction loss decreased early and stabilized below 0.03 for English and 0.006 for Telugu by step 30,000.
@@ -125,38 +127,38 @@ Table 2 reports the progression of training and validation loss values across 30
 ## 4. Observations on Generated Speech Quality
 
 ### 4.1 Evaluation of English Test Sentences (E1–E4)
-Each synthesized English sentence was evaluated for pronunciation clarity, naturalness, and speech timing:
 
-- **E1 ("The antidisestablishmentarianism movement gained considerable momentum during the parliamentary proceedings."):**  
-  *Audio Duration:* 7.13s (614 frames). The model synthesized the complex 28-phoneme compound word clearly without stuttering, phoneme skipping, or looping. Because FastSpeech 2 uses feed-forward duration regulation instead of attention-based alignments, it maintains high stability on long, multisyllabic words.
+**Sentence E1:** *"The antidisestablishmentarianism movement gained considerable momentum during the parliamentary proceedings."*  
+The model synthesized the complex 28-phoneme compound word clearly without hesitation, phoneme skipping, or looping. Because FastSpeech 2 uses feed-forward duration regulation instead of attention-based alignments, it maintains high stability on long, multisyllabic words.
 
-- **E2a ("The orchestra's conduct during the ceremony was praised by the audience."):**  
-  *Audio Duration:* 4.39s (378 frames). The noun *conduct* correctly received primary stress on the first syllable. The first vowel was audibly prolonged and had higher acoustic prominence relative to the second syllable.
+**Sentence E2a:** *"The orchestra's conduct during the ceremony was praised by the audience."*  
+The noun *conduct* correctly received primary stress on the first syllable. The first vowel was audibly prolonged and had higher acoustic prominence relative to the reduced second syllable.
 
-- **E2b ("The researchers will conduct an experiment to evaluate the proposed method."):**  
-  *Audio Duration:* 4.48s (386 frames). The verb *conduct* was synthesized with stress on the second syllable. The first vowel reduced to a brief schwa, while the second vowel carried higher pitch and duration, producing a clear audible contrast with E2a.
+**Sentence E2b:** *"The researchers will conduct an experiment to evaluate the proposed method."*  
+The verb *conduct* was synthesized with stress on the second syllable. The first vowel reduced to a brief schwa, while the second vowel carried higher pitch and duration, producing a clear audible contrast with E2a.
 
-- **E3 ("The rhyth m of the orchestra changed unexpectedly."):**  
-  *Audio Duration:* 3.54s (305 frames). The tokenizer preserved the whitespace in `"rhyth m"` by inserting a short pause, followed by pronouncing the isolated letter `"m"`. The model synthesized this prompt cleanly without audio artifacts.
+**Sentence E3:** *"The rhyth m of the orchestra changed unexpectedly."*  
+The tokenizer preserved the whitespace in `"rhyth m"` by inserting a short pause, followed by pronouncing the isolated letter `"m"`. The model synthesized this prompt cleanly without audio artifacts.
 
-- **E4 ("The meeting will start at 10:45 AM on 12 November 2026, so andaroo should arrive on time."):**  
-  *Audio Duration:* 7.20s (620 frames). The text normalizer correctly expanded the clock time and calendar date into spoken words. The borrowed Telugu word *andaroo* blended smoothly into the English sentence intonation.
+**Sentence E4:** *"The meeting will start at 10:45 AM on 12 November 2026, so andaroo should arrive on time."*  
+The text normalizer correctly expanded the clock time and calendar date into spoken words. The borrowed Telugu word *andaroo* blended smoothly into the English sentence intonation.
 
 ### 4.2 Evaluation of Telugu Test Sentences (T1–T4)
-- **T1 ("న్యూరోఫార్మకోలాజికల్ పరిశోధనలో నూతన ఔషధాల ప్రభావాన్ని విశ్లేషించారు."):**  
-  *Audio Duration:* 6.56s (565 frames). The G2P engine broke down the technical loanword and complex consonant clusters into clean phonemes. Long vowel sounds were held for the correct length, matching natural Telugu pronunciation.
 
-- **T2a ("తాడుపై అతని పట్టు చాలా బలంగా ఉంది."):**  
-  *Audio Duration:* 3.36s (289 frames). Synthesizes *పట్టు* as a noun meaning *grip*. The retroflex double consonant produced a clear closure silence followed by an emphatic release.
+**Sentence T1:** *"న్యూరోఫార్మకోలాజికల్ పరిశోధనలో నూతన ఔషధాల ప్రభావాన్ని విశ్లేషించారు."*  
+The phonetic engine broke down the technical loanword and complex consonant clusters into clean phonemes. Long vowel sounds were held for the correct length, matching natural Telugu pronunciation.
 
-- **T2b ("ఆమె పట్టు చీరను ధరించి వేడుకకు వచ్చింది."):**  
-  *Audio Duration:* 3.42s (295 frames). Synthesizes *పట్టు* as an adjective modifying *silk saree*. The duration and pitch of *పట్టు* were slightly reduced, keeping the main focus on the following noun *చీరను*.
+**Sentence T2a:** *"తాడుపై అతని పట్టు చాలా బలంగా ఉంది."*  
+Synthesizes *పట్టు* as a noun meaning *grip*. The retroflex double consonant produced a clear closure silence followed by an emphatic release.
 
-- **T3 ("పులి అడ విలో నిశ్శబ్దంగా నడిచింది."):**  
-  *Audio Duration:* 2.79s (240 frames). The artificial space in `"అడ విలో"` resulted in a brief inter-word pause, while the double consonant in `"నిశ్శబ్దంగా"` was articulated smoothly without unintended breaks.
+**Sentence T2b:** *"ఆమె పట్టు చీరను ధరించి వేడుకకు వచ్చింది."*  
+Synthesizes *పట్టు* as an adjective modifying *silk saree*. The duration and pitch of *పట్టు* were slightly reduced, keeping the main focus on the following noun *చీరను*.
 
-- **T4 ("ఈ సమావేశం 2026 నవంబర్ 12వ తేదీ ఉదయం 10:45 గంటలకు ప్రారంభమవుతుంది, సమయానికి సిద్ధంగా ఉంచండి."):**  
-  *Audio Duration:* 12.60s (1,085 frames). Demonstrates stable pitch declination across a long 136-phoneme sentence. The year, date ordinal, and time were all articulated clearly in spoken Telugu.
+**Sentence T3:** *"పులి అడ విలో నిశ్శబ్దంగా నడిచింది."*  
+The artificial space in `"అడ విలో"` resulted in a brief inter-word pause, while the double consonant in `"నిశ్శబ్దంగా"` was articulated smoothly without unintended breaks.
+
+**Sentence T4:** *"ఈ సమావేశం 2026 నవంబర్ 12వ తేదీ ఉదయం 10:45 గంటలకు ప్రారంభమవుతుంది, సమయానికి సిద్ధంగా ఉంచండి."*  
+Demonstrates stable pitch declination across a long 136-phoneme sentence. The year, date ordinal, and time were all articulated clearly in spoken Telugu.
 
 ---
 
@@ -169,47 +171,41 @@ In English sentence E1, stressed vowels receive between 10 and 11 frames (approx
 
 In Telugu, phonemic vowel length directly governs duration. In sentence T1, long vowels receive 12 to 13 frames (approximately 140 to 151 ms), which is about 1.4 times longer than short vowels (9 frames). In sentences T2a and T2b (Figure 2b), *పట్టు* occupies 41 frames as an independent noun in T2a, and compresses to 37 frames (a 9.8% reduction) when acting as an adjective in T2b.
 
-<div class="figure-side-by-side">
-  <div class="figure-item-half">
-    <img src="../../Results/English/variance_adaptor_plots/duration/E2a_vs_E2b_comparison.png" alt="English Duration Comparison">
-    <div class="caption">(a) English: Noun vs. Verb Duration Shift on <em>conduct</em> (E2a vs. E2b)</div>
-  </div>
-  <div class="figure-item-half">
-    <img src="../../Results/Telugu/variance_adaptor_plots/duration/T2a_vs_T2b_comparison.png" alt="Telugu Duration Comparison">
-    <div class="caption">(b) Telugu: Head Noun vs. Modifier Duration on <em>పట్టు</em> (T2a vs. T2b)</div>
-  </div>
+<div class="figure-full">
+  <img src="../../Results/English/variance_adaptor_plots/duration/E2a_vs_E2b_comparison.png" alt="English Duration Comparison">
+  <div class="caption">Figure 2a: English phoneme-level duration comparison showing syntactic stress shift on <em>conduct</em> between noun (E2a) and verb (E2b).</div>
 </div>
-<div class="figure-main-caption"><strong>Figure 2:</strong> Phoneme-level duration comparison plots showing syntactic stress shift in English and contextual duration compression in Telugu.</div>
+
+<div class="figure-full">
+  <img src="../../Results/Telugu/variance_adaptor_plots/duration/T2a_vs_T2b_comparison.png" alt="Telugu Duration Comparison">
+  <div class="caption">Figure 2b: Telugu phoneme-level duration comparison showing contextual duration compression on <em>పట్టు</em> between head noun (T2a) and pre-nominal modifier (T2b).</div>
+</div>
 
 ### 5.2 Pitch (F₀) Contours
 Pitch curves show a natural downward declination across sentences, starting near 220 Hz and resolving near 160 Hz at sentence boundaries. In English sentence E4 (Figure 3a), noticeable pitch peaks appear on focal information units such as the clock time and date before resolving at the end of the sentence. In Telugu (Figure 3b), pitch contours remain smooth and melodic between 190 Hz and 250 Hz, with a pitch plateau over retroflex geminate consonants.
 
-<div class="figure-side-by-side">
-  <div class="figure-item-half">
-    <img src="../../Results/English/variance_adaptor_plots/pitch/E4_pitch.png" alt="English Pitch Contour">
-    <div class="caption">(a) English Pitch (F₀) Contour for Sentence E4</div>
-  </div>
-  <div class="figure-item-half">
-    <img src="../../Results/Telugu/variance_adaptor_plots/pitch/T2a_pitch.png" alt="Telugu Pitch Contour">
-    <div class="caption">(b) Telugu Pitch (F₀) Contour for Sentence T2a</div>
-  </div>
+<div class="figure-full">
+  <img src="../../Results/English/variance_adaptor_plots/pitch/E4_pitch.png" alt="English Pitch Contour">
+  <div class="caption">Figure 3a: English predicted fundamental frequency (F₀) contour and aligned spectrogram for sentence E4.</div>
 </div>
-<div class="figure-main-caption"><strong>Figure 3:</strong> Predicted fundamental frequency (F₀) contours for English and Telugu test sentences.</div>
+
+<div class="figure-full">
+  <img src="../../Results/Telugu/variance_adaptor_plots/pitch/T2a_pitch.png" alt="Telugu Pitch Contour">
+  <div class="caption">Figure 3b: Telugu predicted fundamental frequency (F₀) contour and aligned spectrogram for sentence T2a.</div>
+</div>
 
 ### 5.3 Energy Profiles
 Energy contours closely track speech sonority. Vowel centers reach peak frame energy values between 60 and 75, while unvoiced consonants and stop closures drop to 20 to 35. Inter-word pause tokens drop to baseline energy values below 10. In Telugu geminate stops, the energy curve exhibits a distinct valley during the closure phase followed by a sharp energy burst at vowel release.
 
-<div class="figure-side-by-side">
-  <div class="figure-item-half">
-    <img src="../../Results/English/variance_adaptor_plots/energy/E4_energy.png" alt="English Energy Contour">
-    <div class="caption">(a) English Energy Profile for Sentence E4</div>
-  </div>
-  <div class="figure-item-half">
-    <img src="../../Results/Telugu/variance_adaptor_plots/energy/T2a_energy.png" alt="Telugu Energy Profile">
-    <div class="caption">(b) Telugu Energy Profile for Sentence T2a</div>
-  </div>
+<div class="figure-full">
+  <img src="../../Results/English/variance_adaptor_plots/energy/E4_energy.png" alt="English Energy Profile">
+  <div class="caption">Figure 4a: English predicted frame-level energy profile and spectrogram for sentence E4.</div>
 </div>
-<div class="figure-main-caption"><strong>Figure 4:</strong> Predicted frame-level energy profiles showing clear sonority contrasts between vowels, consonants, and pauses.</div>
+
+<div class="figure-full">
+  <img src="../../Results/Telugu/variance_adaptor_plots/energy/T2a_energy.png" alt="Telugu Energy Profile">
+  <div class="caption">Figure 4b: Telugu predicted frame-level energy profile and spectrogram for sentence T2a.</div>
+</div>
 
 ---
 
