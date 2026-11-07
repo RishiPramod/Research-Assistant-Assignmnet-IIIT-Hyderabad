@@ -84,7 +84,7 @@ Both models were configured using identical structural dimensions and training p
 | | 1D Convolution Kernels / Dropout | Kernel sizes = [9, 1], Dropout = 0.2 |
 | **Mel PostNet** | Convolutions & Residual Connections | 5-layer 1D Conv (512 channels, kernel 5, batch norm) |
 | **Neural Vocoder** | Model Architecture | Pre-trained HiFi-GAN (Universal, 22,050 Hz) |
-| **Optimization** | Optimizer & Parameters | Adam (β₁ = 0.9, β₂ = 0.98, ε = 10⁻⁹, weight decay 0.0) |
+| **Optimization** | Optimizer & Parameters | Adam (β<sub>1</sub> = 0.9, β<sub>2</sub> = 0.98, ε = 10<sup>−9</sup>, weight decay 0.0) |
 | | Learning Rate Schedule | Noam decay: <i>d</i><sub>model</sub><sup>−0.5</sup> · min(step<sup>−0.5</sup>, step · warmup<sup>−1.5</sup>) |
 | | Warmup Steps / Gradient Clipping | 2,000 warmup steps, Gradient clip threshold = 1.0 |
 | | Batch Size & Total Training Steps | Batch size = 16 utterances, Total steps = 30,000 |
@@ -182,13 +182,13 @@ In contrast to the English model, the synthesized Telugu speech benefits from st
 The 50-phoneme G2P engine accurately resolved the transliterated English scientific compound loanword into clean phonemes without phoneme dropping. Phonemic vowel length contrasts were accurately respected, with long vowels ([uu], [oo], [aa]) sustained for 12–14 frames while short vowels ([i], [a]) occupied 6–8 frames.
 
 **Sentence T2a:** *"తాడుపై అతని పట్టు చాలా బలంగా ఉంది."*  
-Synthesizes *పట్టు* as an independent head noun meaning *grip*. The retroflex double consonant produces an extended closure silence (14 frames) followed by an emphatic release burst (8 frames), giving the word prominent acoustic weight (total: 41 frames).
+Synthesizes *pattu* (*పట్టు*) as an independent head noun meaning *grip*. The retroflex double consonant produces an extended closure silence (14 frames) followed by an emphatic release burst (8 frames), giving the word prominent acoustic weight (total: 41 frames).
 
 **Sentence T2b:** *"ఆమె పట్టు చీరను ధరించి వేడుకకు వచ్చింది."*  
-Synthesizes *పట్టు* as a pre-nominal modifier (*silk saree*). The model accurately compressed the duration of *పట్టు* to 37 frames (a 9.8% reduction), subordinating it prosodically to the primary head noun *చీరను*.
+Synthesizes *pattu* (*పట్టు*) as a pre-nominal modifier (*silk saree*). The model accurately compressed the duration of *pattu* to 37 frames (a 9.8% reduction), subordinating it prosodically to the primary head noun *chiiranu* (*చీరను*).
 
 **Sentence T3:** *"పులి అడ విలో నిశ్శబ్దంగా నడిచింది."*  
-- *Adversarial Whitespace Analysis:* Paralleling English E3, the accidental space in *"అడ విలో"* forced the word to be parsed as two distinct words, inserting a 24-frame inter-word pause with an energy drop below 10. Conversely, within the uncorrupted word *"నిశ్శబ్దంగా"*, the geminate consonant cluster [sh sh] was articulated smoothly with a 13-frame closure and zero unintended pausing.
+- *Adversarial Whitespace Analysis:* Paralleling English E3, the accidental space in *ada viloo* (*అడ విలో*) forced the word to be parsed as two distinct words, inserting a 24-frame inter-word pause with an energy drop below 10. Conversely, within the uncorrupted word *nishshabdangaa* (*నిశ్శబ్దంగా*), the geminate consonant cluster [sh sh] was articulated smoothly with a 13-frame closure and zero unintended pausing.
 
 **Sentence T4:** *"ఈ సమావేశం 2026 నవంబర్ 12వ తేదీ ఉదయం 10:45 గంటలకు ప్రారంభమవుతుంది, సమయానికి సిద్ధంగా ఉంచండి."*  
 The model synthesized this 136-phoneme complex sentence with smooth pitch declination across all 1,060 mel frames (~12.3 seconds) without pitch wobble or duration collapse. The year, ordinal date, and timestamp were all articulated in natural spoken Telugu.
@@ -203,7 +203,7 @@ The variance adaptor predicts the duration, pitch, and energy for each phoneme, 
 Phoneme durations directly govern the rhythmic cadence of synthesized speech:
 - In English sentence E1, stressed vowels receive between 10 and 11 frames (~116 to 128 ms), while unstressed vowels and stop closures compress to 2 to 4 frames (~23 to 46 ms).
 - **Homograph Stress Contrast (Figure 2a):** In sentence E2a (*conduct* as a noun), primary stress on syllable 1 prolongs the vowel [AA1] to **10 frames** (~116 ms), while syllable 2 vowel [AH0] reduces to **4 frames** (~46 ms) (total syllable durations: 17 frames vs. 14 frames). Conversely, in sentence E2b (*conduct* as a verb), syllable 1 vowel [AH0] reduces to **3 frames** (~35 ms), while syllable 2 vowel [AH1] prolongs to **10 frames** (~116 ms) (total syllable durations: 10 frames vs. 20 frames). This quantitative duration shift produces the clear audible stress contrast observed in synthesis.
-- **Telugu Contextual Compression (Figure 2b):** In Telugu, vowel length is phonemically contrastive rather than stress-timed. In sentence T1, long vowels receive 12 to 14 frames, approximately 1.5 times longer than short vowels (6 to 8 frames). When comparing sentences T2a and T2b, the word *పట్టు* occupies **41 frames** as an independent head noun in T2a ([p]=3, [a]=9, [tt closure]=14, [tt release]=8, [u]=7), and compresses to **37 frames** ([p]=3, [a]=8, [tt closure]=12, [tt release]=7, [u]=7) in T2b—representing an exact **9.8% contextual duration compression** when functioning as a pre-nominal modifier.
+- **Telugu Contextual Compression (Figure 2b):** In Telugu, vowel length is phonemically contrastive rather than stress-timed. In sentence T1, long vowels receive 12 to 14 frames, approximately 1.5 times longer than short vowels (6 to 8 frames). When comparing sentences T2a and T2b, the word *pattu* (*పట్టు*) occupies **41 frames** as an independent head noun in T2a ([p]=3, [a]=9, [tt closure]=14, [tt release]=8, [u]=7), and compresses to **37 frames** ([p]=3, [a]=8, [tt closure]=12, [tt release]=7, [u]=7) in T2b—representing an exact **9.8% contextual duration compression** when functioning as a pre-nominal modifier.
 
 <div class="figure-full">
   <img src="../../Results/English/variance_adaptor_plots/duration/E2a_vs_E2b_comparison.png" alt="English Duration Comparison">
@@ -212,7 +212,7 @@ Phoneme durations directly govern the rhythmic cadence of synthesized speech:
 
 <div class="figure-full">
   <img src="../../Results/Telugu/variance_adaptor_plots/duration/T2a_vs_T2b_comparison.png" alt="Telugu Duration Comparison">
-  <div class="caption">Figure 2b: Telugu phoneme-level duration comparison showing contextual duration compression on <em>పట్టు</em> between head noun (T2a, 41 frames) and pre-nominal modifier (T2b, 37 frames).</div>
+  <div class="caption">Figure 2b: Telugu phoneme-level duration comparison showing contextual duration compression on <em>pattu</em> (పట్టు) between head noun (T2a, 41 frames) and pre-nominal modifier (T2b, 37 frames).</div>
 </div>
 
 ### 5.2 Comprehensive Multi-Sentence Variance Grids (E1–E4 & T1–T4)
@@ -235,9 +235,9 @@ Detailed examination of the multi-panel grids and individual sentence contours r
 2. **English E2a vs. E2b (Syntactic Homograph):** Pitch contours mirror the duration shifts: in E2a, <i>F</i>₀ peaks at 245 Hz on syllable 1 of *conduct*, whereas in E2b, <i>F</i>₀ rises to a prominent peak of 278 Hz over syllable 2, confirming that FastSpeech 2 jointly modulates duration, pitch, and energy to convey syntactic category.
 3. **English E3 (Whitespace Typo):** The whitespace insertion in *"rhyth m"* causes the variance adaptor to insert a dedicated silence token (*sp*) spanning 28 frames (~325 ms). During this interval, predicted energy drops sharply to baseline (<10), providing visual and acoustic proof of the tokenizer-induced pause between *"rhyth"* and the isolated letter *"m"*.
 4. **English E4 (Code-Switching & Numerals):** Pitch peaks reach focal maxima over information-dense tokens: 310 Hz on clock time "10:45 AM" and 295 Hz on calendar date "12 November 2026". Over the borrowed Telugu word *andaroo* ([AA1 N D AH0 R UW1], 38 frames), pitch and energy blend continuously with surrounding English words, demonstrating stable cross-lingual variance transfer.
-5. **Telugu T1 (Technical Loanword):** The loanword *న్యూరోఫార్మకోలాజికల్* occupies 148 frames, with long vowels [uu] (13 frames) and [oo] (12 frames) clearly separated by consonant cluster closures. Pitch remains steady between 220 Hz and 260 Hz, confirming stability on long out-of-vocabulary compounds.
-6. **Telugu T2a vs. T2b (Contextual Compression):** In T2a, *పట్టు* exhibits a prolonged closure interval (14 frames) with an energy dip followed by a sharp burst. In T2b, the closure compresses to 12 frames and release to 7 frames, reducing overall prominence before the primary stress of *చీరను*.
-7. **Telugu T3 (Split Whitespace vs. Geminates):** In *"అడ విలో"*, the split whitespace generates an artificial 24-frame inter-word pause with an energy drop below 10. In contrast, within the correct word *"నిశ్శబ్దంగా"*, the geminate [sh sh] maintains continuous acoustic context with a clean 13-frame closure silence without unintended pauses.
+5. **Telugu T1 (Technical Loanword):** The loanword *nyuuroophaarmakoolajikal* (*న్యూరోఫార్మకోలాజికల్*) occupies 148 frames, with long vowels [uu] (13 frames) and [oo] (12 frames) clearly separated by consonant cluster closures. Pitch remains steady between 220 Hz and 260 Hz, confirming stability on long out-of-vocabulary compounds.
+6. **Telugu T2a vs. T2b (Contextual Compression):** In T2a, *pattu* (*పట్టు*) exhibits a prolonged closure interval (14 frames) with an energy dip followed by a sharp burst. In T2b, the closure compresses to 12 frames and release to 7 frames, reducing overall prominence before the primary stress of *chiiranu* (*చీరను*).
+7. **Telugu T3 (Split Whitespace vs. Geminates):** In *ada viloo* (*అడ విలో*), the split whitespace generates an artificial 24-frame inter-word pause with an energy drop below 10. In contrast, within the correct word *nishshabdangaa* (*నిశ్శబ్దంగా*), the geminate [sh sh] maintains continuous acoustic context with a clean 13-frame closure silence without unintended pauses.
 8. **Telugu T4 (Formal Numeral Declination):** Across the long 136-phoneme, 1,060-frame sentence (~12.3 seconds), the pitch curve exhibits textbook linguistic declination: commencing near 280 Hz on the initial demonstrative, maintaining melodic plateaus across the expanded year and date ordinals, and resolving near 150 Hz at sentence completion.
 
 ---
