@@ -187,6 +187,105 @@ def clean_mel_for_vocoder(mel, phones=None, durations=None, min_db=-11.5):
     return mel_cleaned
 
 
+def generate_multi_sentence_grid(results_cache, stats, output_png_path, title_prefix="English"):
+    """
+    Creates a publication-quality stacked multi-panel figure displaying all 5 test sentences.
+    Each subplot displays:
+      - Aligned 80-channel Log-Mel Spectrogram (viridis colormap)
+      - Phoneme duration boundaries (white dashed vertical lines)
+      - Predicted Pitch (F0) contour (red curve, right twin axis)
+      - Predicted Energy profile (cyan curve, overlaid)
+    """
+    pitch_min, pitch_max, pitch_mean, pitch_std = stats["pitch"]
+    energy_min, energy_max, energy_mean, energy_std = stats["energy"]
+
+    sample_ids = [s for s in ["E1", "E2a", "E2b", "E3", "E4", "T1", "T2a", "T2b", "T3", "T4"] if s in results_cache]
+    if not sample_ids:
+        sample_ids = list(results_cache.keys())
+    n_samples = len(sample_ids)
+
+    fig, axes = plt.subplots(n_samples, 1, figsize=(11.0, 2.4 * n_samples), dpi=220)
+    if n_samples == 1:
+        axes = [axes]
+
+    fig.suptitle(
+        f"{title_prefix} FastSpeech 2 — Comprehensive Variance Adaptor Predictions (All Test Sentences)",
+        fontsize=15,
+        fontweight="bold",
+        y=0.99,
+    )
+
+    for idx, sample_id in enumerate(sample_ids):
+        ax = axes[idx]
+        item = results_cache[sample_id]
+        mel = item["mel"]
+        dur = item["duration"]
+        pitch = item["pitch"]
+        energy = item["energy"]
+        raw_text = item.get("raw_text", sample_id)
+
+        pitch_hz = pitch * pitch_std + pitch_mean
+        energy_val = energy * energy_std + energy_mean
+
+        dur_int = np.round(dur).astype(int)
+        pitch_frame = []
+        energy_frame = []
+        for d, p, e in zip(dur_int, pitch_hz, energy_val):
+            pitch_frame.extend([p] * max(1, d))
+            energy_frame.extend([e] * max(1, d))
+        pitch_frame = np.array(pitch_frame[: mel.shape[1]])
+        energy_frame = np.array(energy_frame[: mel.shape[1]])
+
+        # 1. Mel Spectrogram
+        ax.imshow(mel, origin="lower", aspect="auto", cmap="viridis")
+
+        # 2. Phoneme Boundaries (white dashed lines)
+        cum_d = np.cumsum(dur_int)
+        for b in cum_d[:-1]:
+            if b < mel.shape[1]:
+                ax.axvline(x=b, color="white", linestyle="--", linewidth=0.6, alpha=0.55)
+
+        # 3. Energy Profile (cyan curve overlaid on mel channels 10-60)
+        if len(energy_frame) > 0:
+            e_min_v, e_max_v = np.min(energy_frame), np.max(energy_frame)
+            e_norm = (energy_frame - e_min_v) / (e_max_v - e_min_v + 1e-5)
+            e_scaled = e_norm * 45.0 + 12.0
+            ax.plot(np.arange(len(e_scaled)), e_scaled, color="#00e5ff", linewidth=1.6, label="Predicted Energy (cyan)")
+
+        # 4. Pitch F0 Contour (red curve on right twin axis)
+        ax_pitch = ax.twinx()
+        if len(pitch_frame) > 0:
+            ax_pitch.plot(np.arange(len(pitch_frame)), pitch_frame, color="#ff3333", linewidth=1.8, label="Predicted F0 (red)")
+            ax_pitch.set_ylabel("F0 (Hz)", color="#cc0000", fontsize=10, fontweight="bold")
+            ax_pitch.tick_params(axis="y", labelcolor="#cc0000", labelsize=9)
+            for label in ax_pitch.get_yticklabels():
+                label.set_fontweight("semibold")
+            ax_pitch.set_ylim(80, 380)
+
+        total_frames = int(np.sum(dur_int))
+        short_prompt = raw_text[:70] + ("..." if len(raw_text) > 70 else "")
+        ax.set_title(
+            f"[{sample_id}] \"{short_prompt}\" (Duration: {total_frames} frames / {total_frames*0.0116:.2f}s)",
+            fontsize=11,
+            fontweight="bold",
+            pad=4,
+            loc="left",
+        )
+        ax.set_ylabel("Mel Bin (0–80)", fontsize=10, fontweight="bold")
+        ax.tick_params(axis="both", which="major", labelsize=9)
+        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+            label.set_fontweight("semibold")
+
+        if idx == n_samples - 1:
+            ax.set_xlabel("Time (Mel Frames, 1 frame ≈ 11.6 ms)", fontsize=10.5, fontweight="bold")
+
+    fig.subplots_adjust(top=0.95, bottom=0.04, hspace=0.38, left=0.08, right=0.92)
+    os.makedirs(os.path.dirname(output_png_path), exist_ok=True)
+    plt.savefig(output_png_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Generated multi-sentence grid: {output_png_path}")
+    return True
+
 def plot_homograph_comparison(results_cache, stats, plots_root_dir):
     """
     Generates a dedicated, highly legible comparative plot between E2a (Noun 'conduct')
@@ -417,8 +516,16 @@ def run_test_suite(model, configs, vocoder, spk_emb, control_values):
                 "duration": dur_pred,
                 "pitch": pitch_pred,
                 "energy": energy_pred,
+                "mel": mel_pred,
+                "raw_text": sentence,
             }
 
+    generate_multi_sentence_grid(
+        results_cache,
+        stats,
+        os.path.join(plots_out_dir, "english_all_sentences_grid.png"),
+        title_prefix="English",
+    )
     plot_homograph_comparison(results_cache, stats, plots_out_dir)
 
 
