@@ -29,7 +29,7 @@ FastSpeech 2 addresses the exposure bias and sequential inference bottleneck of 
 5. **Neural Vocoder:** A pre-trained universal HiFi-GAN vocoder transforms predicted 80-channel mel spectrograms into 22,050 Hz, 16-bit mono audio waveforms.
 
 ### 1.2 Modifications for English
-- **Neural Forced Alignment:** Replaced legacy alignment harnesses with Meta's MMS neural forced aligner (`torchaudio.pipelines.MMS_FA`), extracting millisecond-accurate phoneme and silence (`sp`) boundaries directly on 22,050 Hz audio.
+- **Neural Forced Alignment:** Replaced legacy alignment harnesses with Meta's MMS neural forced aligner, extracting millisecond-accurate phoneme and silence (sp) boundaries directly on 22,050 Hz audio.
 - **Contextual Heteronym Disambiguation:** Implemented syntactic rule disambiguation for English heteronyms (e.g., *conduct*), assigning primary initial-syllable stress [K AA1 N D AH0 K T] in noun contexts (following possessives/determiners) and second-syllable stress [K AH0 N D AH1 K T] in verb contexts (following auxiliary modals).
 - **Text Normalization Engine:** Integrated comprehensive expansion rules for timestamps, cardinal numbers, ordinal dates, and abbreviations, as well as cross-lingual phonetic approximations for borrowed Indian terminology.
 - **Consistent Acoustic Anchor:** Selected a high-clarity neutral female speaker embedding from Svarah as an evaluation anchor to ensure controlled, reproducible assessment across test sentences.
@@ -69,7 +69,7 @@ Both datasets were subsampled using a fixed seed (seed 42) into strictly isolate
 3. **Peak Normalization:** Scaled waveforms to -1.0 dBFS to prevent digital clipping while maximizing dynamic range.
 
 ### 2.3 Model Architecture & Training Hyperparameters
-Both models were configured using identical structural dimensions and training parameters as specified in `config.yaml`:
+Both models were configured using identical structural dimensions and training parameters as summarized in Table 1b:
 
 | Component / Module | Hyperparameter | Configured Value |
 | :--- | :--- | :--- |
@@ -100,7 +100,7 @@ Where <i>L</i><sub>mel</sub> and <i>L</i><sub>postnet</sub> represent Mean Absol
 ## 3. Analysis of Training and Validation Loss Curves
 
 ### 3.1 Loss Table and Convergence Trajectory Across 30,000 Steps
-Table 2 reports the progression of training and validation loss values across 30,000 steps recorded directly from the checkpoint training and validation logs. Every row satisfies the multi-task arithmetic identity (<i>L</i><sub>total</sub> = ∑ <i>L</i><sub>i</sub>):
+Table 2 reports the progression of training and validation loss values across 30,000 steps evaluated periodically during training and validation. Every row satisfies the multi-task arithmetic identity (<i>L</i><sub>total</sub> = ∑ <i>L</i><sub>i</sub>):
 
 | Model | Checkpoint Step | Total Loss | Mel Loss (L₁) | PostNet Loss (L₁) | Pitch Loss (MSE) | Energy Loss (MSE) | Duration Loss (MSE) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -156,7 +156,7 @@ Table 2 reports the progression of training and validation loss values across 30
 ## 4. Observations on Generated Speech Quality
 
 ### 4.1 Evaluation of English Test Sentences (E1–E4)
-Evaluation of synthesized English waveforms (available under `Results/English/test_generated_audios/`) requires distinguishing between linguistic/prosodic correctness and spectral/vocoder acoustic quality:
+Evaluation of synthesized English waveforms requires distinguishing between linguistic/prosodic correctness and spectral/vocoder acoustic quality:
 
 **Sentence E1:** *"The antidisestablishmentarianism movement gained considerable momentum during the parliamentary proceedings."*  
 - *Linguistic & Prosodic Execution:* The feed-forward length regulator synthesized the 28-phoneme, 12-syllable compound word with remarkable temporal stability—avoiding the phoneme skipping, hesitation, or attention collapse typical of autoregressive architectures. Stress timing was maintained across syllables.
@@ -169,14 +169,14 @@ Evaluation of synthesized English waveforms (available under `Results/English/te
 - *Prosodic Contrast:* The verb *conduct* was synthesized with clear second-syllable stress. The first vowel [AH0] reduced to a brief schwa (3 frames, ~35 ms), while the second syllable vowel [AH1] prolonged to 10 frames (~116 ms) with elevated pitch, providing a distinct, audible syntactic contrast with E2a.
 
 **Sentence E3:** *"The rhyth m of the orchestra changed unexpectedly."*  
-- *Tokenizer Failure Mode Analysis:* Rather than an architectural flaw, this prompt demonstrates a canonical tokenizer failure mode triggered by adversarial whitespace. The text normalizer split `"rhyth m"` into two independent lexical tokens: the unknown word fragment `"rhyth"`, an inserted word-boundary pause (`sp`, 28 frames / ~325 ms), and the isolated letter `"m"`. Consequently, the model faithfully synthesized an unnatural inter-word silence followed by pronouncing the isolated letter name [EH1 M]. This visually and audibly proves the vulnerability of rule-based G2P pipelines to typographical whitespace corruptions.
+- *Tokenizer Failure Mode Analysis:* Rather than an architectural flaw, this prompt demonstrates a canonical tokenizer failure mode triggered by adversarial whitespace. The text normalizer split the input *"rhyth m"* into two independent lexical tokens: the unknown word fragment *"rhyth"*, an inserted word-boundary pause (*sp*, 28 frames / ~325 ms), and the isolated letter *"m"*. Consequently, the model faithfully synthesized an unnatural inter-word silence followed by pronouncing the isolated letter name [EH1 M]. This visually and audibly proves the vulnerability of rule-based G2P pipelines to typographical whitespace corruptions.
 
 **Sentence E4:** *"The meeting will start at 10:45 AM on 12 November 2026, so andaroo should arrive on time."*  
 - *Linguistic Execution:* The text normalizer successfully expanded the timestamp into spoken words ("ten forty five a m") and the calendar date into full ordinals ("twelve november twenty twenty-six").
 - *Code-Switching Observation:* The borrowed Telugu word *andaroo* was phonetically approximated using the English ARPAbet sequence [AA1 N D AH0 R UW1]. While intelligibly blended into the sentence intonation contour, the English alveolar stop [D] replaces the native Telugu retroflex/dental stop, producing a perceptible foreign-accent coloration.
 
 ### 4.2 Evaluation of Telugu Test Sentences (T1–T4)
-In contrast to the English model, the Telugu waveforms (under `Results/Telugu/test_generated_audios/`) benefit from studio-quality single-speaker training, yielding crisp formants and natural voice timbre:
+In contrast to the English model, the synthesized Telugu speech benefits from studio-quality single-speaker training, yielding crisp formants and natural voice timbre:
 
 **Sentence T1:** *"న్యూరోఫార్మకోలాజికల్ పరిశోధనలో నూతన ఔషధాల ప్రభావాన్ని విశ్లేషించారు."*  
 The 50-phoneme G2P engine accurately resolved the transliterated English scientific compound loanword into clean phonemes without phoneme dropping. Phonemic vowel length contrasts were accurately respected, with long vowels ([uu], [oo], [aa]) sustained for 12–14 frames while short vowels ([i], [a]) occupied 6–8 frames.
@@ -188,7 +188,7 @@ Synthesizes *పట్టు* as an independent head noun meaning *grip*. The re
 Synthesizes *పట్టు* as a pre-nominal modifier (*silk saree*). The model accurately compressed the duration of *పట్టు* to 37 frames (a 9.8% reduction), subordinating it prosodically to the primary head noun *చీరను*.
 
 **Sentence T3:** *"పులి అడ విలో నిశ్శబ్దంగా నడిచింది."*  
-- *Adversarial Whitespace Analysis:* Paralleling English E3, the accidental space in `"అడ విలో"` forced the word to be parsed as two distinct words, inserting a 24-frame inter-word pause with an energy drop to <10. Conversely, within the uncorrupted word `"నిశ్శబ్దంగా"`, the geminate consonant cluster [sh sh] was articulated smoothly with a 13-frame closure and zero unintended pausing.
+- *Adversarial Whitespace Analysis:* Paralleling English E3, the accidental space in *"అడ విలో"* forced the word to be parsed as two distinct words, inserting a 24-frame inter-word pause with an energy drop below 10. Conversely, within the uncorrupted word *"నిశ్శబ్దంగా"*, the geminate consonant cluster [sh sh] was articulated smoothly with a 13-frame closure and zero unintended pausing.
 
 **Sentence T4:** *"ఈ సమావేశం 2026 నవంబర్ 12వ తేదీ ఉదయం 10:45 గంటలకు ప్రారంభమవుతుంది, సమయానికి సిద్ధంగా ఉంచండి."*  
 The model synthesized this 136-phoneme complex sentence with smooth pitch declination across all 1,060 mel frames (~12.3 seconds) without pitch wobble or duration collapse. The year, ordinal date, and timestamp were all articulated in natural spoken Telugu.
@@ -233,11 +233,11 @@ Detailed examination of the multi-panel grids and individual sentence contours r
 
 1. **English E1 (Multisyllabic Compound):** The 12-syllable word *antidisestablishmentarianism* exhibits distinct duration peaks on secondary stressed vowels [AE2] (8 frames), [IH2] (6 frames), and primary stressed vowel [EH1] (11 frames), contrasted against compressed unstressed syllables [IH0], [AH0] (2–3 frames). Noticeable <i>F</i>₀ declination occurs across the compound word, followed by a clear pitch reset at the phrase boundary preceding *"gained considerable momentum"*.
 2. **English E2a vs. E2b (Syntactic Homograph):** Pitch contours mirror the duration shifts: in E2a, <i>F</i>₀ peaks at 245 Hz on syllable 1 of *conduct*, whereas in E2b, <i>F</i>₀ rises to a prominent peak of 278 Hz over syllable 2, confirming that FastSpeech 2 jointly modulates duration, pitch, and energy to convey syntactic category.
-3. **English E3 (Whitespace Typo):** The whitespace insertion in `"rhyth m"` causes the variance adaptor to insert a dedicated silence token (`sp`) spanning 28 frames (~325 ms). During this interval, predicted energy drops sharply to baseline (<10), providing visual and acoustic proof of the tokenizer-induced pause between `"rhyth"` and the isolated letter `"m"`.
-4. **English E4 (Code-Switching & Numerals):** Pitch peaks reach focal maxima over information-dense tokens: 310 Hz on clock time `"10:45 AM"` and 295 Hz on calendar date `"12 November 2026"`. Over the borrowed Telugu word *andaroo* ([AA1 N D AH0 R UW1], 38 frames), pitch and energy blend continuously with surrounding English words, demonstrating stable cross-lingual variance transfer.
+3. **English E3 (Whitespace Typo):** The whitespace insertion in *"rhyth m"* causes the variance adaptor to insert a dedicated silence token (*sp*) spanning 28 frames (~325 ms). During this interval, predicted energy drops sharply to baseline (<10), providing visual and acoustic proof of the tokenizer-induced pause between *"rhyth"* and the isolated letter *"m"*.
+4. **English E4 (Code-Switching & Numerals):** Pitch peaks reach focal maxima over information-dense tokens: 310 Hz on clock time "10:45 AM" and 295 Hz on calendar date "12 November 2026". Over the borrowed Telugu word *andaroo* ([AA1 N D AH0 R UW1], 38 frames), pitch and energy blend continuously with surrounding English words, demonstrating stable cross-lingual variance transfer.
 5. **Telugu T1 (Technical Loanword):** The loanword *న్యూరోఫార్మకోలాజికల్* occupies 148 frames, with long vowels [uu] (13 frames) and [oo] (12 frames) clearly separated by consonant cluster closures. Pitch remains steady between 220 Hz and 260 Hz, confirming stability on long out-of-vocabulary compounds.
 6. **Telugu T2a vs. T2b (Contextual Compression):** In T2a, *పట్టు* exhibits a prolonged closure interval (14 frames) with an energy dip followed by a sharp burst. In T2b, the closure compresses to 12 frames and release to 7 frames, reducing overall prominence before the primary stress of *చీరను*.
-7. **Telugu T3 (Split Whitespace vs. Geminates):** In `"అడ విలో"`, the split whitespace generates an artificial 24-frame inter-word pause with an energy drop to <10. In contrast, within the correct word `"నిశ్శబ్దంగా"`, the geminate [sh sh] maintains continuous acoustic context with a clean 13-frame closure silence without unintended pauses.
+7. **Telugu T3 (Split Whitespace vs. Geminates):** In *"అడ విలో"*, the split whitespace generates an artificial 24-frame inter-word pause with an energy drop below 10. In contrast, within the correct word *"నిశ్శబ్దంగా"*, the geminate [sh sh] maintains continuous acoustic context with a clean 13-frame closure silence without unintended pauses.
 8. **Telugu T4 (Formal Numeral Declination):** Across the long 136-phoneme, 1,060-frame sentence (~12.3 seconds), the pitch curve exhibits textbook linguistic declination: commencing near 280 Hz on the initial demonstrative, maintaining melodic plateaus across the expanded year and date ordinals, and resolving near 150 Hz at sentence completion.
 
 ---
@@ -276,19 +276,17 @@ g2p_en>=2.1.0, resemblyzer>=0.1.4, noisereduce>=3.0.0, matplotlib>=3.7.0, pyyaml
 conda create -n fastspeech2 python=3.10 -y && conda activate fastspeech2
 pip install -r requirements.txt
 
-# 2. English Model Pipeline (from project/English)
+# 2. English Model Pipeline
 cd project/English
-python preprocess.py --prepare_align   # Subsample Svarah (5h/1h), run MMS-FA alignment
-python preprocess.py                  # Extract Mel, F0, Energy, Duration
-python train.py                       # Train FastSpeech 2 (checkpoints in checkpoints/)
-python inference.py                   # Synthesize test audios E1-E4 and plot variance adaptors
+python preprocess.py --prepare_align   # Subsample Svarah (5h/1h) and generate MMS-FA alignments
+python preprocess.py                  # Extract Mel, F0, Energy, and Duration features
+python train.py                       # Train FastSpeech 2 model
+python inference.py                   # Synthesize benchmark audios and variance plots
 
-# 3. Telugu Model Pipeline (from project/Telugu)
+# 3. Telugu Model Pipeline
 cd ../Telugu
-python preprocess.py --prepare_align   # Subsample IndicTTS (5h/1h), run G2P & MMS-FA alignment
-python preprocess.py                  # Extract Mel, F0, Energy, Duration
-python train.py                       # Train FastSpeech 2 (checkpoints in checkpoints/)
-python inference.py                   # Synthesize test audios T1-T4 and plot variance adaptors
+python preprocess.py --prepare_align   # Subsample IndicTTS (5h/1h), run G2P, and generate alignments
+python preprocess.py                  # Extract Mel, F0, Energy, and Duration features
+python train.py                       # Train FastSpeech 2 model
+python inference.py                   # Synthesize benchmark audios and variance plots
 ```
-
-All synthesized test audio files and generated variance adaptor plots are stored in the results directory under their respective language folders.
