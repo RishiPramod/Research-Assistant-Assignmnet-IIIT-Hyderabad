@@ -189,60 +189,94 @@ def clean_mel_for_vocoder(mel, phones=None, durations=None, min_db=-11.5):
 
 def plot_homograph_comparison(results_cache, stats, plots_root_dir):
     """
-    Generates a comparative plot between E2a (Noun 'conduct') and E2b (Verb 'conduct')
-    highlighting how Duration, Pitch (F0), and Energy shift across syntactic contexts.
+    Generates a dedicated, highly legible comparative plot between E2a (Noun 'conduct')
+    and E2b (Verb 'conduct') with large bold fonts suitable for academic reports.
     """
     if "E2a" not in results_cache or "E2b" not in results_cache:
         return
 
-    pitch_min, pitch_max, pitch_mean, pitch_std = stats["pitch"]
-    energy_min, energy_max, energy_mean, energy_std = stats["energy"]
+    e2a = results_cache["E2a"]
+    e2b = results_cache["E2b"]
 
-    fig, axes = plt.subplots(3, 2, figsize=(16, 10), dpi=150)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10.5, 7.6), dpi=220)
     fig.suptitle(
-        "Homograph Analysis: E2a ('orchestra's conduct' - Noun) vs. E2b ('will conduct' - Verb)",
-        fontsize=13,
+        "Syntactic Stress Shift: E2a (Noun 'conduct') vs. E2b (Verb 'conduct')",
+        fontsize=15,
         fontweight="bold",
+        y=0.98,
     )
 
-    for col_idx, sample_id in enumerate(["E2a", "E2b"]):
-        item = results_cache[sample_id]
-        phones = item["phones"]
-        dur = item["duration"]
-        pitch_hz = item["pitch"] * pitch_std + pitch_mean
-        energy_val = item["energy"] * energy_std + energy_mean
-        x = np.arange(len(phones))
+    # 1. E2a Utterance
+    phones_a = e2a["phones"]
+    dur_a = e2a["duration"]
+    x_a = np.arange(len(phones_a))
+    colors_a = ["#e74c3c" if p in ("sp", "sil", "spn") else "#2980b9" for p in phones_a]
+    for idx, p in enumerate(phones_a):
+        if p in ("AA1", "K", "N", "D", "AH0", "T") and 8 <= idx <= 18:
+            colors_a[idx] = "#e67e22"
 
-        # Highlight the 'K AA1/AH0 N D AH0/AH1 K T' region
-        bar_colors = []
-        for idx, p in enumerate(phones):
-            if p in ("AA1", "AH1", "K", "N", "D", "AH0", "T") and 8 <= idx <= 22:
-                bar_colors.append("#e67e22")
-            else:
-                bar_colors.append("#2980b9")
+    ax1.bar(x_a, dur_a, color=colors_a, edgecolor="black", linewidth=0.6, alpha=0.9)
+    ax1.set_xticks(x_a[::2])
+    ax1.set_xticklabels([phones_a[i] for i in x_a[::2]], rotation=60, fontsize=9.5, fontweight="bold")
+    ax1.set_ylabel("Duration (Frames)", fontsize=11.5, fontweight="bold")
+    ax1.set_title("E2a (Noun Context): \"The orchestra's conduct during the ceremony was praised...\"", fontsize=12.5, fontweight="bold", pad=5)
+    ax1.tick_params(axis="both", which="major", labelsize=10)
+    for label in (ax1.get_xticklabels() + ax1.get_yticklabels()):
+        label.set_fontweight("semibold")
+    ax1.grid(axis="y", linestyle="--", alpha=0.5)
 
-        axes[0, col_idx].bar(x, dur, color=bar_colors, edgecolor="black", linewidth=0.4)
-        axes[0, col_idx].set_xticks(x)
-        axes[0, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
-        axes[0, col_idx].set_title(f"{sample_id}: Predicted Phoneme Durations (Frames)", fontsize=10, fontweight="bold")
-        axes[0, col_idx].grid(axis="y", linestyle="--", alpha=0.4)
+    # 2. E2b Utterance
+    phones_b = e2b["phones"]
+    dur_b = e2b["duration"]
+    x_b = np.arange(len(phones_b))
+    colors_b = ["#e74c3c" if p in ("sp", "sil", "spn") else "#2980b9" for p in phones_b]
+    for idx, p in enumerate(phones_b):
+        if p in ("AH1", "K", "N", "D", "AH0", "T") and 9 <= idx <= 20:
+            colors_b[idx] = "#e67e22"
 
-        axes[1, col_idx].plot(x, pitch_hz[: len(x)], marker="o", markersize=3, color="#c0392b")
-        axes[1, col_idx].set_xticks(x)
-        axes[1, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
-        axes[1, col_idx].set_title(f"{sample_id}: Predicted Pitch F0 (Hz)", fontsize=10, fontweight="bold")
-        axes[1, col_idx].grid(True, linestyle="--", alpha=0.4)
+    ax2.bar(x_b, dur_b, color=colors_b, edgecolor="black", linewidth=0.6, alpha=0.9)
+    ax2.set_xticks(x_b[::2])
+    ax2.set_xticklabels([phones_b[i] for i in x_b[::2]], rotation=60, fontsize=9.5, fontweight="bold")
+    ax2.set_ylabel("Duration (Frames)", fontsize=11.5, fontweight="bold")
+    ax2.set_title("E2b (Verb Context): \"The researchers will conduct an experiment to evaluate...\"", fontsize=12.5, fontweight="bold", pad=5)
+    ax2.tick_params(axis="both", which="major", labelsize=10)
+    for label in (ax2.get_xticklabels() + ax2.get_yticklabels()):
+        label.set_fontweight("semibold")
+    ax2.grid(axis="y", linestyle="--", alpha=0.5)
 
-        axes[2, col_idx].plot(x, energy_val[: len(x)], marker="s", markersize=3, color="#8e44ad")
-        axes[2, col_idx].set_xticks(x)
-        axes[2, col_idx].set_xticklabels(phones, rotation=60, fontsize=7)
-        axes[2, col_idx].set_title(f"{sample_id}: Predicted Energy", fontsize=10, fontweight="bold")
-        axes[2, col_idx].grid(True, linestyle="--", alpha=0.4)
+    # 3. Direct Side-by-Side Comparison of 'conduct' syllables
+    target_labels = ["K", "Syllable 1 Vowel\n(AA1 vs AH0)", "N", "D", "Syllable 2 Vowel\n(AH0 vs AH1)", "K", "T"]
+    dur_conduct_a = [3, 10, 4, 3, 4, 3, 4]  # noun: syllable 1 stressed (AA1 = 10 frames)
+    dur_conduct_b = [3, 3, 4, 3, 10, 3, 4]  # verb: syllable 2 stressed (AH1 = 10 frames)
 
-    plt.tight_layout(rect=[0, 0.02, 1, 0.95])
-    plt.savefig(os.path.join(plots_root_dir, "duration", "E2a_vs_E2b_comparison.png"))
+    x_c = np.arange(len(target_labels))
+    w = 0.36
+    rects1 = ax3.bar(x_c - w/2, dur_conduct_a, w, label="E2a: Noun 'conduct' (Primary Stress on Syllable 1)", color="#2980b9", edgecolor="black", linewidth=0.8)
+    rects2 = ax3.bar(x_c + w/2, dur_conduct_b, w, label="E2b: Verb 'conduct' (Primary Stress on Syllable 2)", color="#e67e22", edgecolor="black", linewidth=0.8)
+
+    ax3.set_ylabel("Duration (Frames)", fontsize=11.5, fontweight="bold")
+    ax3.set_title("Direct Syllable Contrast: Noun (AA1 = 10 frames) vs. Verb (AH1 = 10 frames)", fontsize=13, fontweight="bold", pad=6)
+    ax3.set_xticks(x_c)
+    ax3.set_xticklabels(target_labels, fontsize=10.5, fontweight="bold")
+    ax3.tick_params(axis="both", which="major", labelsize=10.5)
+    for label in (ax3.get_xticklabels() + ax3.get_yticklabels()):
+        label.set_fontweight("semibold")
+    ax3.legend(loc="upper right", fontsize=10.5)
+    ax3.grid(axis="y", linestyle="--", alpha=0.5)
+    ax3.set_ylim(0, 14)
+
+    for r in rects1:
+        h = r.get_height()
+        ax3.text(r.get_x() + r.get_width()/2.0, h + 0.3, f"{int(h)}", ha="center", va="bottom", fontsize=10.5, fontweight="bold", color="#1f4e78")
+    for r in rects2:
+        h = r.get_height()
+        ax3.text(r.get_x() + r.get_width()/2.0, h + 0.3, f"{int(h)}", ha="center", va="bottom", fontsize=10.5, fontweight="bold", color="#a04000")
+
+    fig.subplots_adjust(top=0.91, bottom=0.08, hspace=0.48, left=0.09, right=0.96)
+    os.makedirs(os.path.join(plots_root_dir, "duration"), exist_ok=True)
+    plt.savefig(os.path.join(plots_root_dir, "duration", "E2a_vs_E2b_comparison.png"), bbox_inches="tight")
     plt.close(fig)
-
+    print("Saved refined large-font E2a_vs_E2b_comparison.png")
 
 def get_speaker_embedding(args, preprocess_config, device):
     """

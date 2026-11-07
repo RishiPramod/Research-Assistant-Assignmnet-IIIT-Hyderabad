@@ -250,7 +250,7 @@ def save_variance_adaptor_plots(
 ):
     """
     Generates dedicated variance adaptor plots for duration, pitch (F0), and energy
-    as required in Results/<Language>/variance_adaptor_plots/{duration,pitch,energy}/.
+    with large, highly legible fonts suitable for academic reports.
     """
     dur_dir = os.path.join(plots_root_dir, "duration")
     pitch_dir = os.path.join(plots_root_dir, "pitch")
@@ -265,37 +265,40 @@ def save_variance_adaptor_plots(
     pitch_hz = pitch_pred_norm * pitch_std + pitch_mean
     energy_val = energy_pred_norm * energy_std + energy_mean
 
-    frame_ms = (hop_length / sampling_rate) * 1000.0
     total_frames = int(np.sum(duration_pred))
-    total_sec = total_frames * hop_length / sampling_rate
     x_idx = np.arange(len(phone_labels))
-    fig_width = max(12, min(28, len(phone_labels) * 0.28))
 
     # 1. Duration Plot
-    fig, ax = plt.subplots(figsize=(fig_width, 5), dpi=150)
+    fig, ax = plt.subplots(figsize=(10.5, 4.6), dpi=220)
     colors = ["#e74c3c" if p in ("sp", "sil", "spn") else "#2980b9" for p in phone_labels]
-    bars = ax.bar(x_idx, duration_pred, color=colors, edgecolor="black", linewidth=0.5, alpha=0.88)
-    ax.set_xticks(x_idx)
-    ax.set_xticklabels(phone_labels, rotation=60, fontsize=8)
-    ax.set_ylabel("Predicted Duration (Mel Frames)", fontsize=10, fontweight="bold")
-    ax.set_xlabel("Telugu Phoneme Sequence (Red = Pause/Word Boundary 'sp')", fontsize=10)
+    bars = ax.bar(x_idx, duration_pred, color=colors, edgecolor="black", linewidth=0.6, alpha=0.9)
+    step_label = max(1, len(phone_labels) // 40)
+    ax.set_xticks(x_idx[::step_label])
+    ax.set_xticklabels([phone_labels[i] for i in x_idx[::step_label]], rotation=60, fontsize=11, fontweight="bold")
+    ax.set_ylabel("Duration (Frames)", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Phoneme Sequence (Red = Pause 'sp')", fontsize=12.5, fontweight="bold")
+    ax.tick_params(axis="both", which="major", labelsize=11)
+    for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+        label.set_fontweight("semibold")
     ax.set_title(
-        f"[{sample_id}] Variance Adaptor — Predicted Phoneme Durations "
-        f"(Total: {total_frames} frames / {total_sec:.2f}s | 1 frame = {frame_ms:.1f}ms)",
-        fontsize=10,
+        f"[{sample_id}] Variance Adaptor — Predicted Phoneme Durations",
+        fontsize=15,
         fontweight="bold",
+        pad=8,
     )
-    ax.grid(axis="y", linestyle="--", alpha=0.4)
-    for bar, d in zip(bars, duration_pred):
-        if d > 0:
-            ax.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                bar.get_height() + 0.2,
-                f"{int(d)}",
-                ha="center",
-                va="bottom",
-                fontsize=6.5,
-            )
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
+    if len(phone_labels) <= 45:
+        for bar, d in zip(bars, duration_pred):
+            if d > 0:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    bar.get_height() + 0.2,
+                    f"{int(d)}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=9.5,
+                    fontweight="bold",
+                )
     plt.tight_layout()
     plt.savefig(os.path.join(dur_dir, f"{sample_id}_duration.png"))
     plt.close(fig)
@@ -328,53 +331,73 @@ def save_variance_adaptor_plots(
         energy_phoneme = np.array(energy_phoneme)
 
     # 2. Pitch (F0) Plot
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(fig_width, 7.5), dpi=150)
-    ax1.plot(x_idx, pitch_phoneme, marker="o", markersize=3.5, color="#d35400", linewidth=1.6, label="Predicted F0 (Hz)")
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10.5, 5.8), dpi=220)
+    ax1.plot(x_idx, pitch_phoneme, marker="o", markersize=4.5, color="#d35400", linewidth=2.6, label="Predicted F0 (Hz)")
     ax1.fill_between(x_idx, pitch_phoneme, color="#e67e22", alpha=0.18)
-    ax1.set_xticks(x_idx)
-    ax1.set_xticklabels(phone_labels, rotation=60, fontsize=8)
-    ax1.set_ylabel("F0 (Hz)", fontsize=10, fontweight="bold")
+    ax1.set_xticks(x_idx[::step_label])
+    ax1.set_xticklabels([phone_labels[i] for i in x_idx[::step_label]], rotation=60, fontsize=10.5, fontweight="bold")
+    ax1.set_ylabel("F0 (Hz)", fontsize=12.5, fontweight="bold")
+    ax1.tick_params(axis="both", which="major", labelsize=11)
+    for label in (ax1.get_xticklabels() + ax1.get_yticklabels()):
+        label.set_fontweight("semibold")
     ax1.set_title(
         f"[{sample_id}] Variance Adaptor — Predicted Pitch (F0) Contour",
-        fontsize=10,
+        fontsize=14.5,
         fontweight="bold",
+        pad=7,
     )
-    ax1.grid(True, linestyle="--", alpha=0.4)
-    ax1.legend(loc="upper right", fontsize=8)
+    ax1.grid(True, linestyle="--", alpha=0.5)
+    ax1.legend(loc="upper right", fontsize=11)
 
     ax2.imshow(mel_pred, origin="lower", aspect="auto", cmap="viridis")
-    ax2.set_ylabel("Mel Bin (0-80)", fontsize=9)
-    ax2.set_xlabel("Time (Mel Frames)", fontsize=9)
+    ax2.set_ylabel("Mel Bin (0-80)", fontsize=12.5, fontweight="bold")
+    ax2.set_xlabel("Time (Mel Frames)", fontsize=12.5, fontweight="bold")
+    ax2.tick_params(axis="both", which="major", labelsize=11)
+    for label in (ax2.get_xticklabels() + ax2.get_yticklabels()):
+        label.set_fontweight("semibold")
     ax2_f0 = ax2.twinx()
-    ax2_f0.plot(np.arange(len(pitch_frame)), pitch_frame, color="#ff5252", linewidth=1.8, label="Expanded Frame-Level F0 (Hz)")
-    ax2_f0.set_ylabel("Frame F0 (Hz)", color="#ff5252", fontsize=9, fontweight="bold")
-    ax2_f0.tick_params(axis="y", labelcolor="#ff5252")
+    ax2_f0.plot(np.arange(len(pitch_frame)), pitch_frame, color="#ff3333", linewidth=2.4, label="Expanded Frame F0 (Hz)")
+    ax2_f0.set_ylabel("Frame F0 (Hz)", color="#cc0000", fontsize=12.5, fontweight="bold")
+    ax2_f0.tick_params(axis="y", labelcolor="#cc0000", labelsize=11)
+    for label in ax2_f0.get_yticklabels():
+        label.set_fontweight("semibold")
+    ax2_f0.legend(loc="upper right", fontsize=11)
     plt.tight_layout()
     plt.savefig(os.path.join(pitch_dir, f"{sample_id}_pitch.png"))
     plt.close(fig)
 
     # 3. Energy Plot
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(fig_width, 7.5), dpi=150)
-    ax1.plot(x_idx, energy_phoneme, marker="s", markersize=3.5, color="#8e44ad", linewidth=1.6, label="Predicted Energy")
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10.5, 5.8), dpi=220)
+    ax1.plot(x_idx, energy_phoneme, marker="s", markersize=4.5, color="#8e44ad", linewidth=2.6, label="Predicted Energy")
     ax1.fill_between(x_idx, energy_phoneme, color="#9b59b6", alpha=0.18)
-    ax1.set_xticks(x_idx)
-    ax1.set_xticklabels(phone_labels, rotation=60, fontsize=8)
-    ax1.set_ylabel("Energy (L2 Magnitude)", fontsize=10, fontweight="bold")
+    ax1.set_xticks(x_idx[::step_label])
+    ax1.set_xticklabels([phone_labels[i] for i in x_idx[::step_label]], rotation=60, fontsize=10.5, fontweight="bold")
+    ax1.set_ylabel("Energy (L2)", fontsize=12.5, fontweight="bold")
+    ax1.tick_params(axis="both", which="major", labelsize=11)
+    for label in (ax1.get_xticklabels() + ax1.get_yticklabels()):
+        label.set_fontweight("semibold")
     ax1.set_title(
         f"[{sample_id}] Variance Adaptor — Predicted Energy Contour",
-        fontsize=10,
+        fontsize=14.5,
         fontweight="bold",
+        pad=7,
     )
-    ax1.grid(True, linestyle="--", alpha=0.4)
-    ax1.legend(loc="upper right", fontsize=8)
+    ax1.grid(True, linestyle="--", alpha=0.5)
+    ax1.legend(loc="upper right", fontsize=11)
 
     ax2.imshow(mel_pred, origin="lower", aspect="auto", cmap="magma")
-    ax2.set_ylabel("Mel Bin (0-80)", fontsize=9)
-    ax2.set_xlabel("Time (Mel Frames)", fontsize=9)
+    ax2.set_ylabel("Mel Bin (0-80)", fontsize=12.5, fontweight="bold")
+    ax2.set_xlabel("Time (Mel Frames)", fontsize=12.5, fontweight="bold")
+    ax2.tick_params(axis="both", which="major", labelsize=11)
+    for label in (ax2.get_xticklabels() + ax2.get_yticklabels()):
+        label.set_fontweight("semibold")
     ax2_en = ax2.twinx()
-    ax2_en.plot(np.arange(len(energy_frame)), energy_frame, color="#00e5ff", linewidth=1.8, label="Expanded Frame-Level Energy")
-    ax2_en.set_ylabel("Frame Energy", color="#00acc1", fontsize=9, fontweight="bold")
-    ax2_en.tick_params(axis="y", labelcolor="#00acc1")
+    ax2_en.plot(np.arange(len(energy_frame)), energy_frame, color="#00e5ff", linewidth=2.4, label="Expanded Frame Energy")
+    ax2_en.set_ylabel("Frame Energy", color="#00838f", fontsize=12.5, fontweight="bold")
+    ax2_en.tick_params(axis="y", labelcolor="#00838f", labelsize=11)
+    for label in ax2_en.get_yticklabels():
+        label.set_fontweight("semibold")
+    ax2_en.legend(loc="upper right", fontsize=11)
     plt.tight_layout()
     plt.savefig(os.path.join(energy_dir, f"{sample_id}_energy.png"))
     plt.close(fig)
@@ -382,9 +405,7 @@ def save_variance_adaptor_plots(
 
 def plot_loss_curves(log_file_path, output_png_path, title_prefix="Training"):
     """
-    Parses FastSpeech2 train/log.txt or val/log.txt and generates a 2x3 loss plot
-    saved to Results/<Language>/training_loss.png or validation_loss.png.
-    Automatically detects multiple training runs and plots the latest run cleanly.
+    Parses train/val loss logs and saves a clean, 6-subplot figure with large bold fonts.
     """
     if not os.path.exists(log_file_path):
         return False
@@ -403,7 +424,6 @@ def plot_loss_curves(log_file_path, output_png_path, title_prefix="Training"):
             m = pattern.search(line)
             if m:
                 s = int(m.group(1))
-                # Detect start of a completely new experiment run from step 0/100
                 if last_step > 5000 and s <= 500 and current_run:
                     runs.append(current_run)
                     current_run = {}
@@ -423,7 +443,6 @@ def plot_loss_curves(log_file_path, output_png_path, title_prefix="Training"):
     if not runs:
         return False
 
-    # Use the latest active experiment run, sorted smoothly from step 0/100 to 30000
     active_dict = runs[-1]
     sorted_steps = sorted(active_dict.keys())
     steps = sorted_steps
@@ -435,8 +454,8 @@ def plot_loss_curves(log_file_path, output_png_path, title_prefix="Training"):
     durations = [active_dict[k][5] for k in sorted_steps]
 
     os.makedirs(os.path.dirname(output_png_path), exist_ok=True)
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8.5), dpi=150)
-    fig.suptitle(f"FastSpeech 2 (Telugu) — {title_prefix} Loss Curves", fontsize=14, fontweight="bold")
+    fig, axes = plt.subplots(2, 3, figsize=(10.5, 6.2), dpi=220)
+    fig.suptitle(f"FastSpeech 2 — {title_prefix} Loss Curves", fontsize=18, fontweight="bold", y=0.98)
 
     panels = [
         (axes[0, 0], totals, "Total Loss", "#c0392b"),
@@ -448,16 +467,20 @@ def plot_loss_curves(log_file_path, output_png_path, title_prefix="Training"):
     ]
 
     for ax, vals, name, col in panels:
-        ax.plot(steps, vals, color=col, linewidth=1.6)
-        ax.set_title(name, fontsize=11, fontweight="bold")
-        ax.set_xlabel("Step", fontsize=9)
-        ax.set_ylabel("Loss", fontsize=9)
-        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.plot(steps, vals, color=col, linewidth=2.8)
+        ax.set_title(name, fontsize=13.5, fontweight="bold", pad=7)
+        ax.set_xlabel("Training Step" if "Training" in title_prefix else "Validation Step", fontsize=12, fontweight="bold")
+        ax.set_ylabel("Loss", fontsize=12, fontweight="bold")
+        ax.tick_params(axis="both", which="major", labelsize=11)
+        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+            label.set_fontweight("semibold")
+        ax.grid(True, linestyle="--", alpha=0.5)
 
-    plt.tight_layout(rect=[0, 0.02, 1, 0.95])
+    plt.tight_layout(rect=[0, 0.02, 1, 0.94])
     plt.savefig(output_png_path)
     plt.close(fig)
     return True
+
 
 
 def plot_mel(data, stats, titles):
